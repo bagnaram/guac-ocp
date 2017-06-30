@@ -252,26 +252,26 @@ objects:
           items:
           - key: 001-create-schema.sql
           - path: 001-create-schema.sql
-          name: container-scripts
-        name: container-scripts-001
+            name: container-scripts
+          name: container-scripts-001
         - ConfigMap:
           items:
           - key: 002-create-admin-user.sql
           - path: 002-create-admin-user.sql
-          name: container-scripts
-        name: container-scripts-002
+            name: container-scripts
+          name: container-scripts-002
         - ConfigMap:
           items:
           - key: 003-create-connection.sql
           - path: 003-create-connection.sql
-          name: container-scripts
-        name: container-scripts-003
+            name: container-scripts
+          name: container-scripts-003
         - ConfigMap:
           items:
           - key: post-init.sh
           - path: post-init.sh
-          name: container-scripts
-        name: container-scripts-postinit
+            name: container-scripts
+          name: container-scripts-postinit
 
     test: false
     triggers:
