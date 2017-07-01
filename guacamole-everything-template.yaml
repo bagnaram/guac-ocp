@@ -22,7 +22,10 @@ objects:
   kind: "ImageStream"
   metadata:
     name: "gcc-builder"
-
+- apiVersion: "v1"
+  kind: "ImageStream"
+  metadata:
+    name: "vnc"
 - apiVersion: v1
   kind: Service
   metadata:
@@ -84,10 +87,10 @@ objects:
     resources: {}
     runPolicy: Serial
     source:
-      contextDir: ${GCC_CONTEXT_DIR}
+      contextDir: /
       git:
-        ref: ${GCC_REPOSITORY_REF}
-        uri: ${GCC_REPOSITORY_URL}
+        ref: ${GUACD_REPOSITORY_REF}
+        uri: ${GUACD_REPOSITORY_URL}
       type: Git
     strategy:
       sourceStrategy:
@@ -114,8 +117,8 @@ objects:
     source:
       contextDir: guacamole-server
       git:
-        ref: master
-        jri: https://github.com/bagnaram/guac-ocp.git
+        ref: ${GCC_REPOSITORY_REF}
+        uri: ${GCC_REPOSITORY_URL}
       type: Git
     strategy:
       dockerStrategy:
@@ -123,7 +126,6 @@ objects:
       type: Docker
     triggers:
     - type: ConfigChange
-
 - apiVersion: v1
   kind: DeploymentConfig
   metadata:
@@ -224,7 +226,7 @@ objects:
           terminationMessagePath: /dev/termination-log
           volumeMounts:
           - mountPath: /var/lib/mysql/data
-            name: mysql-db-data
+            name: guacamole-db-data
           - mountPath: /tmp/001-create-schema.sql
             subPath: 001-create-schema.sql
             name: container-scripts-001
@@ -240,7 +242,6 @@ objects:
             subPath: post-init.sh
             name: container-scripts-postinit
             readOnly: true
-
         dnsPolicy: ClusterFirst
         restartPolicy: Always
         securityContext: {}
@@ -321,6 +322,8 @@ objects:
           - name: MYSQL_PORT
             value: "3306"
           image: jboss-webserver-tomcat8-openshift:latest
+          imagePullPolicy: IfNotPresent
+          name: guacamole-client
           ports:
           - containerPort: 8080
             protocol: TCP
@@ -346,32 +349,6 @@ objects:
   kind: BuildConfig
   metadata:
     annotations:
-      description: Guacamole database
-    name: guacamole-db
-  spec:
-    output:
-      to:
-        kind: ImageStreamTag
-        name: guacamole-db:latest
-    postCommit: {}
-    resources: {}
-    runPolicy: {}
-    source:
-      contextDir: mariadb-container
-      git:
-        ref: master
-        uri: https://github.com/bagnaram/guac-ocp.git
-      type: Git
-    strategy:
-      dockerStrategy:
-        dockerFilePath: Dockerfile.rhel7
-      type: Docker
-    triggers:
-    - type: ConfigChange
-- apiVersion: v1
-  kind: BuildConfig
-  metadata:
-    annotations:
       description: Guacamole client
     name: guacamole-client
   spec:
@@ -379,11 +356,7 @@ objects:
       to:
         kind: ImageStreamTag
         name: guacamole-client:latest
-    postCommit: {}
-    resources: {}
-    runPolicy: {}
     source:
-      contextDir: mariadb-container
       git:
         ref: ${GUACAMOLE_CLIENT_REF}
         uri: ${GUACAMOLE_CLIENT_REPOSITORY_URL}
@@ -392,9 +365,13 @@ objects:
       sourceStrategy:
         env:
         - name: MAVEN_MIRROR_URL
-          value: http://maven-repo
+          value: ${MAVEN_REPO}
         - name: ARTIFACT_DIR
           value: guacamole/target
+        from:
+          kind: ImageStreamTag
+          name: jboss-webserver30-tomcat8-openshift:latest
+          namespace: openshift
       type: Source
     triggers:
     - type: ConfigChange
@@ -409,13 +386,10 @@ objects:
       to:
         kind: ImageStreamTag
         name: vnc:latest
-    postCommit: {}
-    resources: {}
-    runPolicy: {}
     source:
       contextDir: ${VNC_CONTEXT_DIR}
       git:
-        ref: ${VNC_REF}
+        ref: ${VNC_REPOSITORY_REF}
         uri: ${VNC_URL}
       type: Git
     strategy:
@@ -435,9 +409,6 @@ objects:
       to:
         kind: ImageStreamTag
         name: vnc-firefox:latest
-    postCommit: {}
-    resources: {}
-    runPolicy: {}
     source:
       contextDir: ${VNC_FIREFOX_CONTEXT_DIR}
       git:
@@ -912,6 +883,10 @@ parameters:
   name: APP_NAME
   value: guacamole
   required: true
+- description: Maven Repository to utilize for guac-client build
+  displayName: Maven Repository
+  name: MAVEN_REPO
+  value: ""
 - description: The git reporisory containiang guacamole-client
   displayName: guacamole-client git repo
   name: GUACAMOLE_CLIENT_REPOSITORY_URL
@@ -920,6 +895,16 @@ parameters:
 - description: Set this to a branch name, tag or other ref in your repository if you are not using the default branch
   displayName: gcc Source Branch
   name: GUACAMOLE_CLIENT_REF
+  value: master
+  required: true
+- description: The git repository containing the guacamole server
+  displayName: guacd git Repository
+  name: GUACD_REPOSITORY_URL
+  value: https://github.com/apache/incubator-guacamole-server
+  required: true
+- description: Set this to a branch name, tag or other ref in your repository if you are not using the default branch
+  displayName: guacd git Branch
+  name: GUACD_REPOSITORY_REF
   value: master
   required: true
 - description: The git repository containing the gcc builder
@@ -955,7 +940,6 @@ parameters:
   name: GUACAMOLE_DB
   value: guacamole_db
   required: true
-  
 - description: The git repository for the Firefox VNC Dockerfile
   displayName: VNC Firefox Dockerfile Repository 
   name: VNC_URL
